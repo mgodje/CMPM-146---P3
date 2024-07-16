@@ -33,7 +33,7 @@ def if_beneficial_neutral_planet_available(state):
         if planet.num_ships > 20:
             return True
         # if a planet is a short distance away (< 10), it's beneficial
-        elif planet.distance(planet, state.my_planets()) < 10: # wanna do distance from my planet to neutral? because it is currently the other way around
+        elif planet.distance(planet, state.my_planets()) < 10: 
             return True
         else:
             return False
