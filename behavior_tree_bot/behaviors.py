@@ -1,17 +1,11 @@
+#!/usr/bin/env python
+
 import sys
 sys.path.insert(0, '../')
 from planet_wars import issue_order
 
 # Attack the weakest enemy planet
-# Use in bt_bot: Action(attack_weakest_enemy_planet)
 def attack_weakest_enemy_planet(state):
-    """
-    Attempts to attack the weakest enemy planet using the strongest of the bot's planets.
-    Sends half the ships from the strongest planet to the weakest enemy planet.
-    
-    :param state: The current state of the game from planet_wars
-    :return: Boolean indicating if the order was successfully issued
-    """
     if len(state.my_fleets()) > 1:
         return False
     strongest_planet = max(state.my_planets(), key=lambda t: t.num_ships, default=None)
@@ -21,15 +15,7 @@ def attack_weakest_enemy_planet(state):
     return issue_order(state, strongest_planet.ID, weakest_planet.ID, strongest_planet.num_ships // 2)
 
 # Spread to the weakest neutral planet
-# Use in bt_bot: Action(spread_to_weakest_neutral_planet)
 def spread_to_weakest_neutral_planet(state):
-    """
-    Attempts to capture the weakest neutral planet using the strongest of the bot's planets.
-    Sends half the ships from the strongest planet to the weakest neutral planet.
-    
-    :param state: The current state of the game from planet_wars
-    :return: Boolean indicating if the order was successfully issued
-    """
     if len(state.my_fleets()) > 1:
         return False
     strongest_planet = max(state.my_planets(), key=lambda p: p.num_ships, default=None)
@@ -39,15 +25,7 @@ def spread_to_weakest_neutral_planet(state):
     return issue_order(state, strongest_planet.ID, weakest_planet.ID, strongest_planet.num_ships // 2)
 
 # Reinforce a planet under threat
-# Use in bt_bot: Action(reinforce_planet)
 def reinforce_planet(state):
-    """
-    Reinforces planets under threat by sending ships from the nearest allied planet with a surplus.
-    Only reinforces if a planet has less than 20 ships and another planet can spare ships.
-    
-    :param state: The current state of the game from planet_wars
-    :return: Boolean indicating if the reinforcement order was successfully issued
-    """
     for planet in state.my_planets():
         if planet.num_ships < 20:
             source_planet = max(state.my_planets(), key=lambda p: p.num_ships, default=None)
@@ -57,15 +35,7 @@ def reinforce_planet(state):
     return False
 
 # Attack an enemy planet strategically
-# Use in bt_bot: Action(attack_strategically)
 def attack_strategically(state):
-    """
-    Identifies strategic enemy targets based on the enemy fleet size and planet growth rate.
-    Attacks an enemy planet chosen based on a heuristic of growth rate and fleet size.
-    
-    :param state: The current state of the game from planet_wars
-    :return: Boolean indicating if the attack order was successfully issued
-    """
     target_planet = None
     min_strength_ratio = float('inf')
     for planet in state.enemy_planets():
@@ -73,7 +43,6 @@ def attack_strategically(state):
         if strength_ratio < min_strength_ratio:
             min_strength_ratio = strength_ratio
             target_planet = planet
-
     if target_planet:
         source_planet = max(state.my_planets(), key=lambda p: p.num_ships, default=None)
         if source_planet and source_planet.num_ships > 50:
@@ -82,15 +51,7 @@ def attack_strategically(state):
     return False
 
 # Expand to a strategic neutral planet
-# Use in bt_bot: Action(expand_to_strategic_neutral)
 def expand_to_strategic_neutral(state):
-    """
-    Expands control to neutral planets based on strategic value such as location and growth rate.
-    Chooses the neutral planet with the highest growth rate that can be realistically captured.
-    
-    :param state: The current state of the game from planet_wars
-    :return: Boolean indicating if the expansion order was successfully issued
-    """
     target_planet = None
     max_growth_rate = 0
     for planet in state.neutral_planets():
@@ -105,4 +66,59 @@ def expand_to_strategic_neutral(state):
         if source_planet:
             num_ships_to_send = source_planet.num_ships // 3
             return issue_order(state, source_planet.ID, target_planet.ID, num_ships_to_send)
+    return False
+
+# Counter attack when under threat
+def counter_attack(state):
+    for planet in state.my_planets():
+        for enemy_fleet in state.enemy_fleets():
+            if enemy_fleet.destination_planet == planet.ID and enemy_fleet.num_ships > planet.num_ships:
+                source_planet = max(state.my_planets(), key=lambda p: p.num_ships, default=None)
+                if source_planet and source_planet.ID != planet.ID:
+                    num_ships_to_send = source_planet.num_ships // 2
+                    return issue_order(state, source_planet.ID, enemy_fleet.source_planet, num_ships_to_send)
+    return False
+
+# Reinforce strong planets
+def reinforce_strong_planets(state):
+    strong_planet = max(state.my_planets(), key=lambda p: p.num_ships, default=None)
+    if strong_planet and strong_planet.num_ships < 100:
+        source_planet = min(state.my_planets(), key=lambda p: p.num_ships, default=None)
+        if source_planet and source_planet.ID != strong_planet.ID:
+            num_ships_to_send = source_planet.num_ships // 4
+            return issue_order(state, source_planet.ID, strong_planet.ID, num_ships_to_send)
+    return False
+
+# Aggressive expansion
+def aggressive_expansion(state):
+    if len(state.my_fleets()) > 3:
+        return False
+    strongest_planet = max(state.my_planets(), key=lambda p: p.num_ships, default=None)
+    if not strongest_planet:
+        return False
+    for planet in state.not_my_planets():
+        if planet.num_ships < strongest_planet.num_ships:
+            return issue_order(state, strongest_planet.ID, planet.ID, strongest_planet.num_ships // 2)
+    return False
+
+# Early aggressive attack
+def early_aggressive_attack(state):
+    strongest_planet = max(state.my_planets(), key=lambda p: p.num_ships, default=None)
+    weakest_planet = min(state.not_my_planets(), key=lambda p: p.num_ships, default=None)
+    if strongest_planet and weakest_planet:
+        return issue_order(state, strongest_planet.ID, weakest_planet.ID, strongest_planet.num_ships // 3)
+    return False
+
+# Focused attack on newly acquired enemy planets
+def focused_attack_on_new_enemy_planets(state):
+    newly_acquired_planet = min(
+        (planet for planet in state.enemy_planets() if planet.turns_owned < 5),
+        key=lambda p: p.num_ships,
+        default=None
+    )
+    if newly_acquired_planet:
+        source_planet = max(state.my_planets(), key=lambda p: p.num_ships, default=None)
+        if source_planet:
+            num_ships_to_send = source_planet.num_ships // 2
+            return issue_order(state, source_planet.ID, newly_acquired_planet.ID, num_ships_to_send)
     return False
